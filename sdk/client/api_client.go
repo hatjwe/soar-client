@@ -5,12 +5,22 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/hatjwe/soar-client/log"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"strings"
 )
+
+type SoarClient interface {
+	ConventJson() (string, error)
+	AddBlockIp(BlockedIps BlockIP) SoarClient
+	UrlSet(host, path string)
+	HeaderSet(key, value string)
+	SentHttps() (string, error)
+	GetBlockIps() SoarClient
+}
 
 // BlockIP 结构体
 type BlockIP struct {
@@ -34,11 +44,31 @@ func New() *Soar {
 	return cli
 }
 
-func (soar *Soar) SetBody(BlockedIps BlockIP) {
+func (soar *Soar) AddBlockIp(BlockedIps BlockIP) SoarClient {
 
 	soar.BlockIp = append(soar.BlockIp, BlockedIps)
+
+	return soar
+}
+func (soar *Soar) GetBlockIps() SoarClient {
+	return soar
+}
+func (soar *Soar) UrlSet(host, apipath string) {
+
+	soar.URL = host + apipath
+
+}
+func (soar *Soar) HeaderSet(key, value string) {
+	soar.Header[key] = value
+
+}
+func (soar *Soar) BodySet(data string) {
+
+	soar.Body = data
+
 }
 func (soar *Soar) ConventJson() (string, error) {
+
 	if soar.BlockIp == nil {
 		log.Logger.Error("未设置封禁ip数据转换失败")
 	}
@@ -51,19 +81,12 @@ func (soar *Soar) ConventJson() (string, error) {
 	return string(jsonData), err
 
 }
-func (soar *Soar) UrlSet(host, path string) {
-
-	soar.URL = host + path
-
-}
-func (soar *Soar) HeaderSet(key, value string) {
-
-	soar.Header[key] = value
-
-}
-func (soar *Soar) SentHttps(method, url string, body *strings.Reader) (string, error) {
-
-	request, err := http.NewRequest(method, url, body)
+func (soar *Soar) SentHttps() (string, error) {
+	if soar.Methon == "" || soar.URL == "" {
+		return "", errors.New("Methon或url设置为空")
+	}
+	body := strings.NewReader(soar.Body)
+	request, err := http.NewRequest(soar.Methon, soar.URL, body)
 	if err != nil {
 		return "", err
 	}
@@ -84,6 +107,6 @@ func (soar *Soar) SentHttps(method, url string, body *strings.Reader) (string, e
 	if err != nil {
 		return "", err
 	}
-	log.Logger.Info("响应包信息", zap.String("body", string(bodystr)), zap.String("url", url))
+	log.Logger.Info("响应包信息", zap.String("body", string(bodystr)), zap.String("url", soar.URL))
 	return string(bodystr), nil
 }
