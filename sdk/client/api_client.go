@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strings"
 )
 
@@ -20,7 +19,7 @@ type BlockIP struct {
 }
 type Soar struct {
 	// URL is the base URL of the upstream server
-	URL *url.URL
+	URL string
 	//
 	Methon string
 	// AuthInfo is for authentication
@@ -52,7 +51,11 @@ func (soar *Soar) ConventJson() (string, error) {
 	return string(jsonData), err
 
 }
+func (soar *Soar) UrlSet(host, path string) {
 
+	soar.URL = host + path
+
+}
 func (soar *Soar) HeaderSet(key, value string) {
 
 	soar.Header[key] = value
