@@ -9,23 +9,24 @@ import (
 	"github.com/hatjwe/soar-client/log"
 	"go.uber.org/zap"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
 )
 
 type SoarClient interface {
 	ConventJson() (string, error)
-	AddBlockIp(BlockedIps BlockIP) SoarClient
+	AddBlockIp(BlockedIps string) SoarClient
 	UrlSet(host, path string)
 	HeaderSet(key, value string)
 	SentHttps() (string, error)
 	GetBlockIps() SoarClient
+	CheckIp(BlockedIps string) bool
 }
 
 // BlockIP 结构体
 type BlockIP struct {
-	AttackIP    string `json:"attack_ip"`
-	AttackLevel string `json:"attack_level"`
+	AttackIP []string `json:"attack_ip"`
 }
 type Soar struct {
 	// URL is the base URL of the upstream server
@@ -34,7 +35,7 @@ type Soar struct {
 	Methon string
 	// AuthInfo is for authentication
 	Body    string
-	BlockIp []BlockIP
+	BlockIp BlockIP
 	Header  map[string]string
 }
 
@@ -43,10 +44,20 @@ func New() *Soar {
 	cli := new(Soar)
 	return cli
 }
+func (soar *Soar) CheckIp(BlockedIps string) bool {
 
-func (soar *Soar) AddBlockIp(BlockedIps BlockIP) SoarClient {
+	ip := net.ParseIP(BlockedIps)
+	if ip == nil {
+		log.Logger.Error("IP地址解析错误,", zap.String(BlockedIps, "不是有效ip,已忽略继续解析下边ip"))
+		return false
+	}
 
-	soar.BlockIp = append(soar.BlockIp, BlockedIps)
+	return true
+}
+func (soar *Soar) AddBlockIp(BlockedIps string) SoarClient {
+	if soar.CheckIp(BlockedIps) {
+		soar.BlockIp.AttackIP = append(soar.BlockIp.AttackIP, BlockedIps)
+	}
 
 	return soar
 }
@@ -69,10 +80,10 @@ func (soar *Soar) BodySet(data string) {
 }
 func (soar *Soar) ConventJson() (string, error) {
 
-	if soar.BlockIp == nil {
+	if soar.BlockIp.AttackIP == nil {
 		log.Logger.Error("未设置封禁ip数据转换失败")
 	}
-	jsonData, err := json.Marshal(soar.BlockIp)
+	jsonData, err := json.Marshal(soar.BlockIp.AttackIP)
 	if err != nil {
 		log.Logger.Error("转换为 JSON 失败:", zap.Error(err))
 
